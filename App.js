@@ -12,12 +12,16 @@ import * as Font from "expo-font";
 import { Asset } from "expo-asset";
 import apolloClientOptions from "./apollo";
 import styles from "./styles";
+import NavController from "./components/NavController";
+import { AuthProvider } from "./AuthContext";
+import * as Facebook from "expo-facebook";
 
 export default function App() {
   const [loaded, setLoaded] = useState(false);
   const [client, setClient] = useState(null);
   const [isLoggedIn, setIsLoggedIn] = useState(null);
   const preLoad = async () => {
+    // await AsyncStorage.clear();
     try {
       await Font.loadAsync(Ionicons.font);
       await Asset.loadAsync([require("./assets/instaLogo.png")]);
@@ -28,10 +32,18 @@ export default function App() {
       });
       const client = new ApolloClient({
         cache,
+        request: async (operation) => {
+          const token = await AsyncStorage.getItem("jwt");
+          return operation.setContext({
+            headers: {
+              Authorization: `Bearer ${token}`,
+            },
+          });
+        },
         ...apolloClientOptions,
       });
       const isLoggedIn = await AsyncStorage.getItem("isLoggedIn");
-      if (isLoggedIn === null || isLoggedIn === "false") {
+      if (!isLoggedIn || isLoggedIn === "false") {
         setIsLoggedIn(false);
       } else {
         setIsLoggedIn(true);
@@ -46,38 +58,12 @@ export default function App() {
     preLoad();
   }, []);
 
-  const logUserIn = async () => {
-    try {
-      await AsyncStorage.setItem("isLoggedIn", "true");
-      setIsLoggedIn(true);
-    } catch (e) {
-      console.log(e);
-    }
-  };
-  const logUserOut = async () => {
-    try {
-      await AsyncStorage.setItem("isLoggedIn", "false");
-      setIsLoggedIn(false);
-    } catch (e) {
-      console.log(e);
-    }
-  };
   return loaded && client && isLoggedIn !== null ? (
     <ApolloProvider client={client}>
       <ThemeProvider theme={styles}>
-        <View
-          style={{ flex: 1, justifyContent: "center", alignItems: "center" }}
-        >
-          {isLoggedIn === true ? (
-            <TouchableOpacity onPress={logUserOut}>
-              <Text>Log Out</Text>
-            </TouchableOpacity>
-          ) : (
-            <TouchableOpacity onPress={logUserIn}>
-              <Text>Log In</Text>
-            </TouchableOpacity>
-          )}
-        </View>
+        <AuthProvider isLoggedIn={isLoggedIn}>
+          <NavController />
+        </AuthProvider>
       </ThemeProvider>
     </ApolloProvider>
   ) : (
